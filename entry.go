@@ -3,11 +3,16 @@ package log
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"strings"
 	"time"
 )
 
 // Assert interface compliance.
 var _ Interface = (*Entry)(nil)
+
+// Now returns the current time.
+var Now = time.Now
 
 // Entry represents a single log entry.
 type Entry struct {
@@ -16,31 +21,26 @@ type Entry struct {
 	Level     Level     `json:"level"`
 	Timestamp time.Time `json:"timestamp"`
 	Message   string    `json:"message"`
+	start     time.Time
+	fields    []Fields
 }
 
 // NewEntry returns a new entry for `log`.
 func NewEntry(log *Logger) *Entry {
 	return &Entry{
 		Logger: log,
-		Fields: make(Fields),
 	}
 }
 
 // WithFields returns a new Entry with `fields` set.
 func (e *Entry) WithFields(fields Fielder) *Entry {
-	f := Fields{}
-
-	for k, v := range e.Fields {
-		f[k] = v
-	}
-
-	for k, v := range fields.Fields() {
-		f[k] = v
-	}
+	var f []Fields
+	f = append(f, e.fields...)
+	f = append(f, fields.Fields())
 
 	return &Entry{
 		Logger: e.Logger,
-		Fields: f,
+		fields: f,
 	}
 }
 
@@ -50,8 +50,47 @@ func (e *Entry) WithField(key string, value interface{}) *Entry {
 }
 
 // WithError returns a new Entry with the "error" set to `err`.
+//
+// The given error may implement .Fielder, if it does the method
+// will add all its `.Fields()` into the returned entry.
 func (e *Entry) WithError(err error) *Entry {
-	return e.WithField("error", err.Error())
+	if err == nil {
+		return e
+	}
+
+	ctx := e.WithField("error", err.Error())
+
+	if s, ok := err.(stackTracer); ok {
+		frame := s.StackTrace()[0]
+
+		name := fmt.Sprintf("%n", frame)
+		file := fmt.Sprintf("%+s", frame)
+		line := fmt.Sprintf("%d", frame)
+
+		parts := strings.Split(file, "\n\t")
+		if len(parts) > 1 {
+			file = parts[1]
+		}
+
+		ctx = ctx.WithField("source", fmt.Sprintf("%s: %s:%s", name, file, line))
+	}
+
+	if f, ok := err.(Fielder); ok {
+		ctx = ctx.WithFields(f.Fields())
+	}
+
+	return ctx
+}
+
+// WithCaller includes the "filename" and "line" fields.
+func (e *Entry) WithCaller() *Entry {
+	if _, file, line, ok := runtime.Caller(1); ok {
+		return e.WithFields(Fields{
+			"filename": file,
+			"line":     line,
+		})
+	}
+	return e
 }
 
 // Debug level message.
@@ -82,51 +121,71 @@ func (e *Entry) Fatal(msg string) {
 
 // Debugf level formatted message.
 func (e *Entry) Debugf(msg string, v ...interface{}) {
-	e.Logger.log(DebugLevel, e, fmt.Sprintf(msg, v...))
+	e.Debug(fmt.Sprintf(msg, v...))
 }
 
 // Infof level formatted message.
 func (e *Entry) Infof(msg string, v ...interface{}) {
-	e.Logger.log(InfoLevel, e, fmt.Sprintf(msg, v...))
+	e.Info(fmt.Sprintf(msg, v...))
 }
 
 // Warnf level formatted message.
 func (e *Entry) Warnf(msg string, v ...interface{}) {
-	e.Logger.log(WarnLevel, e, fmt.Sprintf(msg, v...))
+	e.Warn(fmt.Sprintf(msg, v...))
 }
 
 // Errorf level formatted message.
 func (e *Entry) Errorf(msg string, v ...interface{}) {
-	e.Logger.log(ErrorLevel, e, fmt.Sprintf(msg, v...))
+	e.Error(fmt.Sprintf(msg, v...))
 }
 
 // Fatalf level formatted message, followed by an exit.
 func (e *Entry) Fatalf(msg string, v ...interface{}) {
-	e.Logger.log(FatalLevel, e, fmt.Sprintf(msg, v...))
-	os.Exit(1)
+	e.Fatal(fmt.Sprintf(msg, v...))
 }
 
 // Trace returns a new Entry with a stop method to fire off
 // a corresponding completion log, useful with defer.
 func (e *Entry) Trace(msg string) *Entry {
-	e.WithField("complete", false).Info(msg)
-	return e.withMessage(msg)
+	e.Info(msg)
+	v := e.WithFields(e.Fields)
+	v.Message = msg
+	v.start = time.Now()
+	return v
 }
 
 // Stop should be used with Trace, to fire off the completion
 // message. When an `err` is passed the "error" field is set,
 // and the log level is error.
-func (e *Entry) Stop(err error) {
-	if err == nil {
-		e.WithField("complete", true).Info(e.Message)
+func (e *Entry) Stop(err *error) {
+	duration := time.Since(e.start).Milliseconds()
+	if err == nil || *err == nil {
+		e.WithField("duration", duration).Info(e.Message)
 	} else {
-		e.WithField("complete", true).WithError(err).Error(e.Message)
+		e.WithField("duration", duration).WithError(*err).Error(e.Message)
 	}
 }
 
-// withMessage returns a new Entry with the message set.
-func (e *Entry) withMessage(msg string) *Entry {
-	v := e.WithFields(e.Fields)
-	v.Message = msg
-	return v
+// mergeFields returns the fields list collapsed into a single map.
+func (e *Entry) mergeFields() Fields {
+	f := Fields{}
+
+	for _, fields := range e.fields {
+		for k, v := range fields {
+			f[k] = v
+		}
+	}
+
+	return f
+}
+
+// finalize returns a copy of the Entry with fields merged.
+func (e *Entry) finalize(level Level, msg string) *Entry {
+	return &Entry{
+		Logger:    e.Logger,
+		Fields:    e.mergeFields(),
+		Level:     level,
+		Message:   msg,
+		Timestamp: Now(),
+	}
 }

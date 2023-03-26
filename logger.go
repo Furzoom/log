@@ -2,7 +2,7 @@ package log
 
 import (
 	stdlog "log"
-	"time"
+	"sort"
 )
 
 // Assert interface compliance.
@@ -19,6 +19,33 @@ type Fields map[string]interface{}
 // Fields implements Fielder.
 func (f Fields) Fields() Fields {
 	return f
+}
+
+// Get field value by name.
+func (f Fields) Get(name string) interface{} {
+	return f[name]
+}
+
+// Names returns field names sorted.
+func (f Fields) Names() (v []string) {
+	for k := range f {
+		v = append(v, k)
+	}
+
+	sort.Strings(v)
+
+	return
+}
+
+// HandlerFunc is an adapter to allow the use fo ordinary
+// functions as log handlers. If f is a function with the
+// appropriate signature, HandlerFunc(f) is a Handler object
+// that calls f.
+type HandlerFunc func(*Entry) error
+
+// HandleLog calls f(e).
+func (f HandlerFunc) HandleLog(e *Entry) error {
+	return f(e)
 }
 
 // Handler is used to handle log events, outputing them to
@@ -107,16 +134,14 @@ func (l *Logger) Trace(msg string) *Entry {
 	return NewEntry(l).Trace(msg)
 }
 
+// log the message, invoking the handler. We clone the entry here
+// to bypass the overhead in Entry methods when the level is not met.
 func (l *Logger) log(level Level, e *Entry, msg string) {
 	if level < l.Level {
 		return
 	}
 
-	e.Level = level
-	e.Message = msg
-	e.Timestamp = time.Now()
-
-	if err := l.Handler.HandleLog(e); err != nil {
+	if err := l.Handler.HandleLog(e.finalize(level, msg)); err != nil {
 		stdlog.Printf("error logging: %s", err)
 	}
 }

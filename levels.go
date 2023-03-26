@@ -1,15 +1,21 @@
 package log
 
 import (
+	"bytes"
 	"errors"
+	"strings"
 )
+
+// ErrInvalidLevel is returned if the severity level is invalid.
+var ErrInvalidLevel = errors.New("invalid level")
 
 // Level of severity.
 type Level int
 
 // Log levels.
 const (
-	DebugLevel Level = iota
+	InvalidLevel Level = iota - 1
+	DebugLevel
 	InfoLevel
 	WarnLevel
 	ErrorLevel
@@ -23,26 +29,53 @@ var levelNames = [...]string{
 	ErrorLevel: "error",
 	FatalLevel: "fatal",
 }
-var invalidError = errors.New("invalid level")
 
-// String implements io.Stringer
+var levelStrings = map[string]Level{
+	"debug":   DebugLevel,
+	"info":    InfoLevel,
+	"warn":    WarnLevel,
+	"warning": WarnLevel,
+	"error":   ErrorLevel,
+	"fatal":   FatalLevel,
+}
+
+// String implementation.
 func (l Level) String() string {
 	return levelNames[l]
 }
 
-func ParseLevel(s string) (Level, error) {
-	switch s {
-	case "debug":
-		return DebugLevel, nil
-	case "info":
-		return InfoLevel, nil
-	case "warn":
-		return WarnLevel, nil
-	case "error":
-		return ErrorLevel, nil
-	case "fatal":
-		return FatalLevel, nil
-	default:
-		return -1, invalidError
+// MarshalJSON implementation.
+func (l Level) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + l.String() + `"`), nil
+}
+
+// UnmarshalJSON implementation.
+func (l *Level) UnmarshalJSON(b []byte) error {
+	v, err := ParseLevel(string(bytes.Trim(b, `"`)))
+	if err != nil {
+		return err
 	}
+
+	*l = v
+
+	return nil
+}
+
+func ParseLevel(s string) (Level, error) {
+	l, ok := levelStrings[strings.ToLower(s)]
+	if !ok {
+		return InvalidLevel, ErrInvalidLevel
+	}
+
+	return l, nil
+}
+
+// MustParseLevel parses level string or panics.
+func MustParseLevel(level string) Level {
+	l, err := ParseLevel(level)
+	if err != nil {
+		panic("invalid log level")
+	}
+
+	return l
 }

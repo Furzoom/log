@@ -91,8 +91,10 @@ func TestLogge_Trace_info(t *testing.T) {
 		Level:   log.InfoLevel,
 	}
 
-	trace := l.WithField("file", "sloth.png").Trace("upload")
-	trace.Stop(nil)
+	_ = func() (err error) {
+		defer l.WithField("file", "sloth.png").Trace("upload").Stop(&err)
+		return nil
+	}()
 
 	assert.Equal(t, 2, len(h.Entries))
 
@@ -100,13 +102,14 @@ func TestLogge_Trace_info(t *testing.T) {
 		e := h.Entries[0]
 		assert.Equal(t, e.Message, "upload")
 		assert.Equal(t, e.Level, log.InfoLevel)
-		assert.Equal(t, log.Fields{"file": "sloth.png", "complete": false}, e.Fields)
+		assert.Equal(t, log.Fields{"file": "sloth.png"}, e.Fields)
 	}
 	{
 		e := h.Entries[1]
 		assert.Equal(t, e.Message, "upload")
 		assert.Equal(t, e.Level, log.InfoLevel)
-		assert.Equal(t, log.Fields{"file": "sloth.png", "complete": true}, e.Fields)
+		assert.Equal(t, "sloth.png", e.Fields["file"])
+		assert.IsType(t, int64(0), e.Fields["duration"])
 	}
 }
 
@@ -118,9 +121,10 @@ func TestLogger_Trace_error(t *testing.T) {
 		Level:   log.InfoLevel,
 	}
 
-	trace := l.WithField("file", "sloth.png").Trace("upload")
-	err := fmt.Errorf("boom")
-	trace.Stop(err)
+	_ = func() (err error) {
+		defer l.WithField("file", "sloth.png").Trace("upload").Stop(&err)
+		return fmt.Errorf("boom")
+	}()
 
 	assert.Equal(t, 2, len(h.Entries))
 
@@ -128,14 +132,63 @@ func TestLogger_Trace_error(t *testing.T) {
 		e := h.Entries[0]
 		assert.Equal(t, e.Message, "upload")
 		assert.Equal(t, e.Level, log.InfoLevel)
-		assert.Equal(t, log.Fields{"file": "sloth.png", "complete": false}, e.Fields)
+		assert.Equal(t, log.Fields{"file": "sloth.png"}, e.Fields)
 	}
 	{
 		e := h.Entries[1]
 		assert.Equal(t, e.Message, "upload")
 		assert.Equal(t, e.Level, log.ErrorLevel)
-		assert.Equal(t, log.Fields{"file": "sloth.png", "error": "boom", "complete": true}, e.Fields)
+		assert.Equal(t, "sloth.png", e.Fields["file"])
+		assert.Equal(t, "boom", e.Fields["error"])
+		assert.IsType(t, int64(0), e.Fields["duration"])
 	}
+}
+
+func TestLogger_Trace_nil(t *testing.T) {
+	h := memory.New()
+
+	l := &log.Logger{
+		Handler: h,
+		Level:   log.InfoLevel,
+	}
+
+	func() {
+		defer l.WithField("file", "sloth.png").Trace("upload").Stop(nil)
+	}()
+
+	assert.Equal(t, 2, len(h.Entries))
+
+	{
+		e := h.Entries[0]
+		assert.Equal(t, e.Message, "upload")
+		assert.Equal(t, e.Level, log.InfoLevel)
+		assert.Equal(t, log.Fields{"file": "sloth.png"}, e.Fields)
+	}
+	{
+		e := h.Entries[1]
+		assert.Equal(t, e.Message, "upload")
+		assert.Equal(t, e.Level, log.InfoLevel)
+		assert.Equal(t, "sloth.png", e.Fields["file"])
+		assert.IsType(t, int64(0), e.Fields["duration"])
+	}
+}
+
+func TestLogger_HandlerFunc(t *testing.T) {
+	h := memory.New()
+	f := func(e *log.Entry) error {
+		return h.HandleLog(e)
+	}
+
+	l := &log.Logger{
+		Handler: log.HandlerFunc(f),
+		Level:   log.InfoLevel,
+	}
+
+	l.Infof("logged in %s", "Container")
+
+	e := h.Entries[0]
+	assert.Equal(t, e.Message, "logged in Container")
+	assert.Equal(t, e.Level, log.InfoLevel)
 }
 
 func BenchmarkLogger_small(b *testing.B) {

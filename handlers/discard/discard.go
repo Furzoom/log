@@ -4,6 +4,9 @@ package discard
 
 import "github.com/furzoom/log"
 
+// Default handler.
+var Default = New()
+
 // Handler implementation
 type Handler struct{}
 

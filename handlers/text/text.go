@@ -4,11 +4,20 @@ package text
 import (
 	"fmt"
 	"io"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/furzoom/log"
 )
 
+// Default handler outputting to stderr.
+var Default = New(os.Stderr)
+
+// start time.
+var start = time.Now()
+
+// Colors.
 const (
 	none   = 0
 	red    = 31
@@ -17,7 +26,8 @@ const (
 	gray   = 37
 )
 
-var colors = [...]int{
+// Colors mapping.
+var Colors = [...]int{
 	log.DebugLevel: gray,
 	log.InfoLevel:  blue,
 	log.WarnLevel:  yellow,
@@ -25,7 +35,8 @@ var colors = [...]int{
 	log.FatalLevel: red,
 }
 
-var strings = [...]string{
+// Strings mapping.
+var Strings = [...]string{
 	log.DebugLevel: "DEBUG",
 	log.InfoLevel:  "INFO",
 	log.WarnLevel:  "WARN",
@@ -48,16 +59,18 @@ func New(w io.Writer) *Handler {
 
 // HandleLog implements log.Handler.
 func (h *Handler) HandleLog(e *log.Entry) error {
-	color := colors[e.Level]
-	level := strings[e.Level]
+	color := Colors[e.Level]
+	level := Strings[e.Level]
+	names := e.Fields.Names()
 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	fmt.Fprintf(h.Writer, "\033[%dm%6s\033[%dm %-25s", color, level, none, e.Message)
+	ts := time.Since(start) / time.Second
+	fmt.Fprintf(h.Writer, "\033[%dm%6s\033[%dm[%04d] %-25s", color, level, none, ts, e.Message)
 
-	for k, v := range e.Fields {
-		fmt.Fprintf(h.Writer, " %s=%v", k, v)
+	for _, name := range names {
+		fmt.Fprintf(h.Writer, " %s=%v", name, e.Fields.Get(name))
 	}
 
 	fmt.Fprintln(h.Writer)

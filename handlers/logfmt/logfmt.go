@@ -3,11 +3,15 @@ package logfmt
 
 import (
 	"io"
+	"os"
 	"sync"
 
 	"github.com/furzoom/log"
 	"github.com/go-logfmt/logfmt"
 )
+
+// Default handler outputting to stderr.
+var Default = New(os.Stderr)
 
 // Handler implementation
 type Handler struct {
@@ -24,26 +28,20 @@ func New(w io.Writer) *Handler {
 
 // HandleLog implements log.Handler.
 func (h *Handler) HandleLog(e *log.Entry) error {
+	names := e.Fields.Names()
+
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if err := h.enc.EncodeKeyval("level", e.Level.String()); err != nil {
-		panic(err)
+	_ = h.enc.EncodeKeyval("timestamp", e.Timestamp)
+	_ = h.enc.EncodeKeyval("level", e.Level.String())
+	_ = h.enc.EncodeKeyval("message", e.Message)
+
+	for _, name := range names {
+		_ = h.enc.EncodeKeyval(name, e.Fields.Get(name))
 	}
 
-	if err := h.enc.EncodeKeyval("message", e.Message); err != nil {
-		panic(err)
-	}
-
-	for k, v := range e.Fields {
-		if err := h.enc.EncodeKeyval(k, v); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := h.enc.EndRecord(); err != nil {
-		panic(err)
-	}
+	_ = h.enc.EndRecord()
 
 	return nil
 }
