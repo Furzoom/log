@@ -26,6 +26,10 @@ const (
 	gray   = 37
 )
 
+const (
+	dataTimeLayout = "2006-01-02 15:04:05.999"
+)
+
 // Colors mapping.
 var Colors = [...]int{
 	log.DebugLevel: gray,
@@ -67,13 +71,14 @@ func (h *Handler) HandleLog(e *log.Entry) error {
 	defer h.mu.Unlock()
 
 	ts := time.Since(start) / time.Second
-	fmt.Fprintf(h.Writer, "\033[%dm%6s\033[%dm[%04d] %-25s", color, level, none, ts, e.Message)
+	_, _ = fmt.Fprintf(h.Writer, "%s \033[%dm%6s\033[%dm[%04d] %-25s",
+		e.Timestamp.Format(dataTimeLayout), color, level, none, ts, e.Message)
 
 	for _, name := range names {
-		fmt.Fprintf(h.Writer, " %s=%v", name, e.Fields.Get(name))
+		_, _ = fmt.Fprintf(h.Writer, " %s=%v", name, e.Fields.Get(name))
 	}
 
-	fmt.Fprintln(h.Writer)
+	_, _ = fmt.Fprintln(h.Writer)
 
 	return nil
 
