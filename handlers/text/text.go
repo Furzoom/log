@@ -52,13 +52,22 @@ var Strings = [...]string{
 type Handler struct {
 	mu     sync.Mutex
 	Writer io.Writer
+	isTTY  bool
 }
 
 // New handler.
 func New(w io.Writer) *Handler {
-	return &Handler{
-		Writer: w,
+	h := &Handler{}
+	if f, ok := w.(*os.File); ok {
+		fi, err := f.Stat()
+		if err == nil && (fi.Mode()&os.ModeCharDevice == os.ModeCharDevice) {
+			h.isTTY = true
+		}
 	}
+
+	h.Writer = w
+
+	return h
 }
 
 // HandleLog implements log.Handler.
@@ -71,8 +80,13 @@ func (h *Handler) HandleLog(e *log.Entry) error {
 	defer h.mu.Unlock()
 
 	ts := time.Since(start) / time.Second
-	_, _ = fmt.Fprintf(h.Writer, "%s \033[%dm%6s\033[%dm[%04d] %-25s",
-		e.Timestamp.Format(dataTimeLayout), color, level, none, ts, e.Message)
+	if h.isTTY {
+		_, _ = fmt.Fprintf(h.Writer, "%s \033[%dm%6s\033[%dm[%04d] %-25s",
+			e.Timestamp.Format(dataTimeLayout), color, level, none, ts, e.Message)
+	} else {
+		_, _ = fmt.Fprintf(h.Writer, "%s %6s[%04d] %-25s",
+			e.Timestamp.Format(dataTimeLayout), level, ts, e.Message)
+	}
 
 	for _, name := range names {
 		_, _ = fmt.Fprintf(h.Writer, " %s=%v", name, e.Fields.Get(name))
