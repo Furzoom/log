@@ -27,7 +27,7 @@ const (
 )
 
 const (
-	dataTimeLayout = "2006-01-02 15:04:05.999"
+	dataTimeLayout = "2006-01-02 15:04:05.000"
 )
 
 // Colors mapping.
