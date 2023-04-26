@@ -28,8 +28,13 @@ type Entry struct {
 
 // NewEntry returns a new entry for `log`.
 func NewEntry(log *Logger) *Entry {
+	if log == nil {
+		return &Entry{}
+	}
+
 	return &Entry{
 		Logger: log,
+		depth:  log.Depth,
 	}
 }
 
@@ -179,7 +184,7 @@ func (e *Entry) mergeFields() Fields {
 }
 
 // finalize returns a copy of the Entry with fields merged.
-func (e *Entry) finalize(level Level, msg string, depth int) *Entry {
+func (e *Entry) finalize(level Level, msg string) *Entry {
 	return &Entry{
 		Logger:    e.Logger,
 		Fields:    e.mergeFields(),
@@ -187,6 +192,5 @@ func (e *Entry) finalize(level Level, msg string, depth int) *Entry {
 		Message:   msg,
 		Timestamp: Now(),
 		Frame:     e.Frame,
-		depth:     depth,
 	}
 }

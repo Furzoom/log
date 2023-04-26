@@ -142,7 +142,7 @@ func (l *Logger) log(level Level, e *Entry, msg string) {
 		return
 	}
 
-	if err := l.Handler.HandleLog(e.finalize(level, msg, l.Depth)); err != nil {
+	if err := l.Handler.HandleLog(e.finalize(level, msg)); err != nil {
 		stdlog.Printf("error logging: %s", err)
 	}
 }
