@@ -16,7 +16,7 @@ func TestEntry_WithFields(t *testing.T) {
 	assert.Equal(t, Fields{"foo": "bar"}, b.mergeFields())
 
 	c := a.WithFields(Fields{"foo": "hello", "bar": "world"})
-	e := c.finalize(InfoLevel, "upload")
+	e := c.finalize(InfoLevel, "upload", 1)
 	assert.Equal(t, e.Message, "upload")
 	assert.Equal(t, e.Fields, Fields{"foo": "hello", "bar": "world"})
 	assert.Equal(t, e.Level, InfoLevel)

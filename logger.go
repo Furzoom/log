@@ -61,6 +61,7 @@ type Handler interface {
 type Logger struct {
 	Handler Handler
 	Level   Level
+	Depth   int
 }
 
 // WithFields returns a new Entry with `field` set.
@@ -141,7 +142,7 @@ func (l *Logger) log(level Level, e *Entry, msg string) {
 		return
 	}
 
-	if err := l.Handler.HandleLog(e.finalize(level, msg)); err != nil {
+	if err := l.Handler.HandleLog(e.finalize(level, msg, l.Depth)); err != nil {
 		stdlog.Printf("error logging: %s", err)
 	}
 }

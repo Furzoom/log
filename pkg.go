@@ -4,6 +4,7 @@ package log
 var Log Interface = &Logger{
 	Handler: HandlerFunc(handleStdLog),
 	Level:   InfoLevel,
+	Depth:   0,
 }
 
 // SetHandler sets the handler. This is not thread-safe.
@@ -26,6 +27,13 @@ func SetLevel(l Level) {
 func SetLevelFromString(level string) {
 	if logger, ok := Log.(*Logger); ok {
 		logger.Level = MustParseLevel(level)
+	}
+}
+
+// SetDepth sets the depth of the frame.
+func SetDepth(depth int) {
+	if logger, ok := Log.(*Logger); ok {
+		logger.Depth = depth
 	}
 }
 

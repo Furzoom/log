@@ -107,31 +107,31 @@ func (e *Entry) Fatal(msg string) {
 
 // Debugf level formatted message.
 func (e *Entry) Debugf(msg string, v ...interface{}) {
-	e.depth = 1
+	e.depth += 1
 	e.Debug(fmt.Sprintf(msg, v...))
 }
 
 // Infof level formatted message.
 func (e *Entry) Infof(msg string, v ...interface{}) {
-	e.depth = 1
+	e.depth += 1
 	e.Info(fmt.Sprintf(msg, v...))
 }
 
 // Warnf level formatted message.
 func (e *Entry) Warnf(msg string, v ...interface{}) {
-	e.depth = 1
+	e.depth += 1
 	e.Warn(fmt.Sprintf(msg, v...))
 }
 
 // Errorf level formatted message.
 func (e *Entry) Errorf(msg string, v ...interface{}) {
-	e.depth = 1
+	e.depth += 1
 	e.Error(fmt.Sprintf(msg, v...))
 }
 
 // Fatalf level formatted message, followed by an exit.
 func (e *Entry) Fatalf(msg string, v ...interface{}) {
-	e.depth = 1
+	e.depth += 1
 	e.Fatal(fmt.Sprintf(msg, v...))
 }
 
@@ -179,7 +179,7 @@ func (e *Entry) mergeFields() Fields {
 }
 
 // finalize returns a copy of the Entry with fields merged.
-func (e *Entry) finalize(level Level, msg string) *Entry {
+func (e *Entry) finalize(level Level, msg string, depth int) *Entry {
 	return &Entry{
 		Logger:    e.Logger,
 		Fields:    e.mergeFields(),
@@ -187,5 +187,6 @@ func (e *Entry) finalize(level Level, msg string) *Entry {
 		Message:   msg,
 		Timestamp: Now(),
 		Frame:     e.Frame,
+		depth:     depth,
 	}
 }
