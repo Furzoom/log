@@ -2,9 +2,11 @@ package main
 
 import (
 	"errors"
+	"os"
+
 	"github.com/furzoom/log"
 	"github.com/furzoom/log/handlers/text"
-	"os"
+	e "github.com/pkg/errors"
 )
 
 func main() {
@@ -21,5 +23,7 @@ func main() {
 	ctx.Info("upload complete")
 	ctx.Warn("upload retry")
 	ctx.WithError(errors.New("unauthorized")).Error("upload failed")
+	err := errors.New("unknown error")
+	ctx.WithError(e.Wrap(err, "test error")).Error("upload failed")
 	ctx.Errorf("failed to upload %s", "img.png")
 }

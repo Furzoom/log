@@ -25,7 +25,10 @@ func TestHandler_text(t *testing.T) {
 	log.WithField("user", "Furzoom").Info("world")
 	log.WithField("user", "Furzoom").Error("boom")
 
-	expected := "\x1b[34m  INFO\x1b[0m[0000] hello                     id=123 user=Furzoom\n\x1b[34m  INFO\x1b[0m[0000] world                     user=Furzoom\n\x1b[31m ERROR\x1b[0m[0000] boom                      user=Furzoom\n"
+	expected := `1970-01-01 08:00:00.000   INFO[0000] text_test.go:24 TestHandler_text() hello                     id=123 user=Furzoom
+1970-01-01 08:00:00.000   INFO[0000] text_test.go:25 TestHandler_text() world                     user=Furzoom
+1970-01-01 08:00:00.000  ERROR[0000] text_test.go:26 TestHandler_text() boom                      user=Furzoom
+`
 
 	assert.Equal(t, expected, buf.String())
 }

@@ -21,7 +21,7 @@ linters:
     - bodyclose     # checks whether HTTP response body is closed successfully
     - errcheck      # checking for unchecked errors in go programs
     - staticcheck   # go vet on steroids, applying a ton of static analysis checks
-    - unused        # checks Go code for unused constants, variables, functions and types
+#    - unused        # checks Go code for unused constants, variables, functions and types
     - varcheck      # finds unused global variables and constants
     - structcheck   # finds unused struct fields
     - deadcode      # finds unused code

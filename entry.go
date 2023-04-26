@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 )
 
@@ -23,6 +22,8 @@ type Entry struct {
 	Message   string    `json:"message"`
 	start     time.Time
 	fields    []Fields
+	Frame     Frame `json:"-"`
+	depth     int
 }
 
 // NewEntry returns a new entry for `log`.
@@ -60,21 +61,6 @@ func (e *Entry) WithError(err error) *Entry {
 
 	ctx := e.WithField("error", err.Error())
 
-	if s, ok := err.(stackTracer); ok {
-		frame := s.StackTrace()[0]
-
-		name := fmt.Sprintf("%n", frame)
-		file := fmt.Sprintf("%+s", frame)
-		line := fmt.Sprintf("%d", frame)
-
-		parts := strings.Split(file, "\n\t")
-		if len(parts) > 1 {
-			file = parts[1]
-		}
-
-		ctx = ctx.WithField("source", fmt.Sprintf("%s: %s:%s", name, file, line))
-	}
-
 	if f, ok := err.(Fielder); ok {
 		ctx = ctx.WithFields(f.Fields())
 	}
@@ -95,53 +81,66 @@ func (e *Entry) WithCaller() *Entry {
 
 // Debug level message.
 func (e *Entry) Debug(msg string) {
-	e.Logger.log(DebugLevel, e, msg)
+	e.log(DebugLevel, msg)
 }
 
 // Info level message.
 func (e *Entry) Info(msg string) {
-	e.Logger.log(InfoLevel, e, msg)
+	e.log(InfoLevel, msg)
 }
 
 // Warn level message.
 func (e *Entry) Warn(msg string) {
-	e.Logger.log(WarnLevel, e, msg)
+	e.log(WarnLevel, msg)
 }
 
 // Error level message.
 func (e *Entry) Error(msg string) {
-	e.Logger.log(ErrorLevel, e, msg)
+	e.log(ErrorLevel, msg)
 }
 
 // Fatal level message, followed by an exit.
 func (e *Entry) Fatal(msg string) {
-	e.Logger.log(FatalLevel, e, msg)
+	e.log(FatalLevel, msg)
 	os.Exit(1)
 }
 
 // Debugf level formatted message.
 func (e *Entry) Debugf(msg string, v ...interface{}) {
+	e.depth = 1
 	e.Debug(fmt.Sprintf(msg, v...))
 }
 
 // Infof level formatted message.
 func (e *Entry) Infof(msg string, v ...interface{}) {
+	e.depth = 1
 	e.Info(fmt.Sprintf(msg, v...))
 }
 
 // Warnf level formatted message.
 func (e *Entry) Warnf(msg string, v ...interface{}) {
+	e.depth = 1
 	e.Warn(fmt.Sprintf(msg, v...))
 }
 
 // Errorf level formatted message.
 func (e *Entry) Errorf(msg string, v ...interface{}) {
+	e.depth = 1
 	e.Error(fmt.Sprintf(msg, v...))
 }
 
 // Fatalf level formatted message, followed by an exit.
 func (e *Entry) Fatalf(msg string, v ...interface{}) {
+	e.depth = 1
 	e.Fatal(fmt.Sprintf(msg, v...))
+}
+
+func (e *Entry) log(level Level, msg string) {
+	e.Frame = NewFrame(e.depth)
+	e.Logger.log(level, e, msg)
+	if level == FatalLevel {
+		os.Exit(1)
+	}
 }
 
 // Trace returns a new Entry with a stop method to fire off
@@ -187,5 +186,6 @@ func (e *Entry) finalize(level Level, msg string) *Entry {
 		Level:     level,
 		Message:   msg,
 		Timestamp: Now(),
+		Frame:     e.Frame,
 	}
 }
